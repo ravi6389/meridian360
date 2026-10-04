@@ -1,0 +1,7 @@
+version: 1
+artifacts:
+  - path: ..\intelligence\meridian_analytics.sv.yaml
+    type: semantic_view
+    targets:
+      default:
+        object: MERIDIAN.INTELLIGENCE.MERIDIAN_ANALYTICS

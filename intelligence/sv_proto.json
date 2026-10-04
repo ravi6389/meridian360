@@ -1,0 +1,33 @@
+{
+  "json_proto": {
+    "name": "MERIDIAN_ANALYTICS",
+    "database": "MERIDIAN",
+    "schema": "INTELLIGENCE",
+    "tables": [
+      {
+        "database": "MERIDIAN", "schema": "SERVING", "table": "CUSTOMER_360",
+        "columnNames": ["PARTY_ID", "FIRST_NAME", "LAST_NAME", "DATE_OF_BIRTH", "EMAIL", "PHONE", "STATE", "HOUSEHOLD_ID", "HOUSEHOLD_MEMBER_COUNT", "TENURE_YEARS", "AGE", "POLICY_COUNT", "LOB_COUNT", "LOBS_HELD", "TOTAL_PREMIUM", "NEAREST_RENEWAL_DAYS", "TOTAL_CLAIMS", "OPEN_CLAIMS", "MAX_CLAIM_DAYS_OPEN", "DISTRESSED_BILLS", "MAX_DAYS_PAST_DUE", "WEB_SESSIONS", "RECENT_RISK_PAGES", "RECENT_CANCEL_PAGES", "RECENT_30D_SENTIMENT", "PRIOR_30D_SENTIMENT", "RECENT_NEGATIVE_CALLS", "TOTAL_CALLS", "QUOTE_COUNT", "SIG_NEGATIVE_SENTIMENT", "SIG_DECLINING_TRAJECTORY", "SIG_CHURN_LANGUAGE", "SIG_COMPETITOR_MENTION", "SIG_CANCELLATION_PAGES", "SIG_RATE_SHOCK", "SIG_DISPUTED_CLAIMS", "SIG_PAYMENT_DISTRESS", "SIG_MONO_LINE", "TENURE_DAMPENER", "CHURN_RISK_SCORE", "CHURN_REASON_CODES"]
+      },
+      {
+        "database": "MERIDIAN", "schema": "SERVING", "table": "NBA_RECOMMENDATION",
+        "columnNames": ["PARTY_ID", "ACTION_TYPE", "ACTION_NAME", "CATEGORY", "CHANNEL", "STATUS", "PROPENSITY", "PREMIUM_AT_RISK", "EXPECTED_VALUE", "URGENCY", "NBA_SCORE", "NEAREST_RENEWAL_DAYS", "NEEDS_SUPERVISOR", "SUPERVISOR_THRESHOLD", "SLA_DAYS", "REASON_TEXT", "REASON_CODES", "EVIDENCE_REF", "SUPPRESSION_RULE_ID", "SUPPRESSION_RULE_NAME", "SUPPRESSION_REASON", "RANK_FOR_CUSTOMER"]
+      }
+    ],
+    "sqlSource": {
+      "queries": [
+        {"sqlText": "SELECT COUNT(*) AS total_policyholders, AVG(CHURN_RISK_SCORE) AS avg_churn_risk, SUM(TOTAL_PREMIUM) AS total_gwp FROM MERIDIAN.SERVING.CUSTOMER_360 WHERE POLICY_COUNT > 0", "correspondingQuestion": "How many policyholders are in the book and what is the total GWP?"},
+        {"sqlText": "SELECT PARTY_ID, FIRST_NAME, LAST_NAME, CHURN_RISK_SCORE, TOTAL_PREMIUM, ROUND(CHURN_RISK_SCORE * TOTAL_PREMIUM, 2) AS expected_loss FROM MERIDIAN.SERVING.CUSTOMER_360 WHERE CHURN_RISK_SCORE > 0.3 ORDER BY expected_loss DESC LIMIT 10", "correspondingQuestion": "Which policyholders have the highest expected loss from attrition?"},
+        {"sqlText": "SELECT STATE, COUNT(*) AS customers, AVG(CHURN_RISK_SCORE) AS avg_churn, SUM(TOTAL_PREMIUM) AS state_gwp FROM MERIDIAN.SERVING.CUSTOMER_360 WHERE POLICY_COUNT > 0 GROUP BY STATE ORDER BY avg_churn DESC", "correspondingQuestion": "Which states have the highest average attrition risk?"},
+        {"sqlText": "SELECT ACTION_NAME, STATUS, COUNT(*) AS cnt, SUM(EXPECTED_VALUE) AS total_ev FROM MERIDIAN.SERVING.NBA_RECOMMENDATION GROUP BY ACTION_NAME, STATUS ORDER BY total_ev DESC", "correspondingQuestion": "How many next best actions are recommended vs suppressed and what is the total expected value?"},
+        {"sqlText": "SELECT SUPPRESSION_RULE_NAME, COUNT(*) AS blocked, SUM(EXPECTED_VALUE) AS ev_forgone FROM MERIDIAN.SERVING.NBA_RECOMMENDATION WHERE STATUS = 'SUPPRESSED' GROUP BY SUPPRESSION_RULE_NAME ORDER BY ev_forgone DESC", "correspondingQuestion": "Which suppression rules are blocking the most expected value?"},
+        {"sqlText": "SELECT PARTY_ID, FIRST_NAME, LAST_NAME, CHURN_RISK_SCORE, TOTAL_PREMIUM, NEAREST_RENEWAL_DAYS, CHURN_REASON_CODES FROM MERIDIAN.SERVING.CUSTOMER_360 WHERE NEAREST_RENEWAL_DAYS BETWEEN 0 AND 45 AND CHURN_RISK_SCORE > 0.3 ORDER BY CHURN_RISK_SCORE DESC LIMIT 20", "correspondingQuestion": "Which high-risk customers are renewing in the next 45 days?"},
+        {"sqlText": "SELECT c.PARTY_ID, c.FIRST_NAME, c.LAST_NAME, c.CHURN_RISK_SCORE, n.ACTION_NAME, n.STATUS, n.EXPECTED_VALUE, n.REASON_TEXT FROM MERIDIAN.SERVING.CUSTOMER_360 c JOIN MERIDIAN.SERVING.NBA_RECOMMENDATION n ON c.PARTY_ID = n.PARTY_ID WHERE c.PARTY_ID = 'CUST-00001' ORDER BY n.RANK_FOR_CUSTOMER", "correspondingQuestion": "What are the recommended actions for customer CUST-00001?"},
+        {"sqlText": "SELECT SIG_RATE_SHOCK, SIG_DISPUTED_CLAIMS, SIG_NEGATIVE_SENTIMENT, SIG_PAYMENT_DISTRESS, COUNT(*) AS cnt, AVG(CHURN_RISK_SCORE) AS avg_risk FROM MERIDIAN.SERVING.CUSTOMER_360 WHERE CHURN_RISK_SCORE > 0 GROUP BY 1,2,3,4 ORDER BY avg_risk DESC LIMIT 10", "correspondingQuestion": "What combinations of churn signals produce the highest risk?"},
+        {"sqlText": "SELECT ACTION_NAME, CATEGORY, COUNT(*) AS cnt, SUM(EXPECTED_VALUE) AS total_ev FROM MERIDIAN.SERVING.NBA_RECOMMENDATION WHERE STATUS = 'RECOMMENDED' AND NEEDS_SUPERVISOR = TRUE GROUP BY ACTION_NAME, CATEGORY ORDER BY total_ev DESC", "correspondingQuestion": "Which recommended actions need supervisor approval and what is their total expected value?"},
+        {"sqlText": "SELECT COUNT(DISTINCT PARTY_ID) AS customers_with_actions, SUM(CASE WHEN STATUS='RECOMMENDED' THEN EXPECTED_VALUE ELSE 0 END) AS recommended_ev, SUM(CASE WHEN STATUS='SUPPRESSED' THEN EXPECTED_VALUE ELSE 0 END) AS suppressed_ev FROM MERIDIAN.SERVING.NBA_RECOMMENDATION", "correspondingQuestion": "What is the total expected value of recommended actions vs suppressed actions across the book?"}
+      ]
+    },
+    "semanticDescription": "Meridian 360 analytics model for a composite property and casualty insurer. Covers the customer book (also called policyholders), churn risk (also called attrition or lapse propensity), gross written premium (GWP, also called total premium), next best actions (NBA), suppression rules (governance guardrails), and renewal management. Use this to answer questions about customer risk, retention worklists, action effectiveness, and conduct-risk governance.",
+    "metadata": {"warehouse": "MERIDIAN_WH"}
+  }
+}

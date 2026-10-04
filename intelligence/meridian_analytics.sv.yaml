@@ -1,0 +1,311 @@
+name: MERIDIAN_ANALYTICS
+description: Meridian 360 analytics model for a composite property and casualty insurer.
+  Covers the customer book (also called policyholders), churn risk (also called attrition
+  or lapse propensity), gross written premium (GWP, also called total premium), next
+  best actions (NBA), suppression rules (governance guardrails), and renewal management.
+  Use this to answer questions about customer risk, retention worklists, action effectiveness,
+  and conduct-risk governance.
+tables:
+  - name: CUSTOMER_360
+    base_table:
+      database: MERIDIAN
+      schema: SERVING
+      table: CUSTOMER_360
+    primary_key:
+      columns:
+        - PARTY_ID
+    dimensions:
+      - name: PARTY_ID
+        expr: PARTY_ID
+        data_type: VARCHAR
+      - name: FIRST_NAME
+        expr: FIRST_NAME
+        data_type: VARCHAR
+      - name: LAST_NAME
+        expr: LAST_NAME
+        data_type: VARCHAR
+      - name: EMAIL
+        expr: EMAIL
+        data_type: VARCHAR
+      - name: PHONE
+        expr: PHONE
+        data_type: VARCHAR
+      - name: STATE
+        expr: STATE
+        data_type: VARCHAR
+      - name: HOUSEHOLD_ID
+        expr: HOUSEHOLD_ID
+        data_type: VARCHAR
+      - name: HOUSEHOLD_MEMBER_COUNT
+        expr: HOUSEHOLD_MEMBER_COUNT
+        data_type: NUMBER
+      - name: AGE
+        expr: AGE
+        data_type: NUMBER
+      - name: POLICY_COUNT
+        expr: POLICY_COUNT
+        data_type: NUMBER
+      - name: LOB_COUNT
+        expr: LOB_COUNT
+        data_type: NUMBER
+      - name: LOBS_HELD
+        expr: LOBS_HELD
+        data_type: ARRAY
+      - name: NEAREST_RENEWAL_DAYS
+        expr: NEAREST_RENEWAL_DAYS
+        data_type: NUMBER
+      - name: TOTAL_CLAIMS
+        expr: TOTAL_CLAIMS
+        data_type: NUMBER
+      - name: OPEN_CLAIMS
+        expr: OPEN_CLAIMS
+        data_type: NUMBER
+      - name: MAX_CLAIM_DAYS_OPEN
+        expr: MAX_CLAIM_DAYS_OPEN
+        data_type: NUMBER
+      - name: DISTRESSED_BILLS
+        expr: DISTRESSED_BILLS
+        data_type: NUMBER
+      - name: MAX_DAYS_PAST_DUE
+        expr: MAX_DAYS_PAST_DUE
+        data_type: NUMBER
+      - name: WEB_SESSIONS
+        expr: WEB_SESSIONS
+        data_type: NUMBER
+      - name: RECENT_RISK_PAGES
+        expr: RECENT_RISK_PAGES
+        data_type: NUMBER
+      - name: RECENT_CANCEL_PAGES
+        expr: RECENT_CANCEL_PAGES
+        data_type: NUMBER
+      - name: RECENT_NEGATIVE_CALLS
+        expr: RECENT_NEGATIVE_CALLS
+        data_type: NUMBER
+      - name: TOTAL_CALLS
+        expr: TOTAL_CALLS
+        data_type: NUMBER
+      - name: QUOTE_COUNT
+        expr: QUOTE_COUNT
+        data_type: NUMBER
+      - name: SIG_DECLINING_TRAJECTORY
+        expr: SIG_DECLINING_TRAJECTORY
+        data_type: NUMBER
+      - name: SIG_RATE_SHOCK
+        expr: SIG_RATE_SHOCK
+        data_type: NUMBER
+      - name: SIG_PAYMENT_DISTRESS
+        expr: SIG_PAYMENT_DISTRESS
+        data_type: NUMBER
+      - name: SIG_MONO_LINE
+        expr: SIG_MONO_LINE
+        data_type: NUMBER
+      - name: CHURN_REASON_CODES
+        expr: CHURN_REASON_CODES
+        data_type: ARRAY
+    time_dimensions:
+      - name: DATE_OF_BIRTH
+        expr: DATE_OF_BIRTH
+        data_type: DATE
+    facts:
+      - name: TENURE_YEARS
+        expr: TENURE_YEARS
+        data_type: NUMBER
+        description: Number of years the customer (policyholder) has been with the insurer.
+      - name: TOTAL_PREMIUM
+        expr: TOTAL_PREMIUM
+        data_type: NUMBER
+        description: Total annual gross written premium (GWP) across all active policies for this customer. Also referred to as book premium.
+      - name: RECENT_30D_SENTIMENT
+        expr: RECENT_30D_SENTIMENT
+        data_type: NUMBER
+      - name: PRIOR_30D_SENTIMENT
+        expr: PRIOR_30D_SENTIMENT
+        data_type: NUMBER
+      - name: SIG_NEGATIVE_SENTIMENT
+        expr: SIG_NEGATIVE_SENTIMENT
+        data_type: NUMBER
+      - name: SIG_CHURN_LANGUAGE
+        expr: SIG_CHURN_LANGUAGE
+        data_type: NUMBER
+      - name: SIG_COMPETITOR_MENTION
+        expr: SIG_COMPETITOR_MENTION
+        data_type: NUMBER
+      - name: SIG_CANCELLATION_PAGES
+        expr: SIG_CANCELLATION_PAGES
+        data_type: NUMBER
+      - name: SIG_DISPUTED_CLAIMS
+        expr: SIG_DISPUTED_CLAIMS
+        data_type: NUMBER
+      - name: TENURE_DAMPENER
+        expr: TENURE_DAMPENER
+        data_type: NUMBER
+      - name: CHURN_RISK_SCORE
+        expr: CHURN_RISK_SCORE
+        data_type: NUMBER
+        description: Composite attrition / lapse propensity score from 0 to 1. Higher means more likely to leave. Also called churn score, attrition risk, or lapse risk.
+  - name: NBA_RECOMMENDATION
+    base_table:
+      database: MERIDIAN
+      schema: SERVING
+      table: NBA_RECOMMENDATION
+    dimensions:
+      - name: PARTY_ID
+        expr: PARTY_ID
+        data_type: VARCHAR
+      - name: ACTION_TYPE
+        expr: ACTION_TYPE
+        data_type: VARCHAR
+      - name: ACTION_NAME
+        expr: ACTION_NAME
+        data_type: VARCHAR
+      - name: CATEGORY
+        expr: CATEGORY
+        data_type: VARCHAR
+      - name: CHANNEL
+        expr: CHANNEL
+        data_type: VARCHAR
+      - name: STATUS
+        expr: STATUS
+        data_type: VARCHAR
+        description: Whether this action is RECOMMENDED (can be executed) or SUPPRESSED (blocked by a governance rule). Suppressed actions are visible but not actionable.
+      - name: NEAREST_RENEWAL_DAYS
+        expr: NEAREST_RENEWAL_DAYS
+        data_type: NUMBER
+      - name: NEEDS_SUPERVISOR
+        expr: NEEDS_SUPERVISOR
+        data_type: BOOLEAN
+      - name: SUPERVISOR_THRESHOLD
+        expr: SUPERVISOR_THRESHOLD
+        data_type: VARCHAR
+      - name: SLA_DAYS
+        expr: SLA_DAYS
+        data_type: NUMBER
+      - name: REASON_TEXT
+        expr: REASON_TEXT
+        data_type: VARCHAR
+      - name: REASON_CODES
+        expr: REASON_CODES
+        data_type: ARRAY
+      - name: EVIDENCE_REF
+        expr: EVIDENCE_REF
+        data_type: VARCHAR
+      - name: SUPPRESSION_RULE_ID
+        expr: SUPPRESSION_RULE_ID
+        data_type: VARCHAR
+      - name: SUPPRESSION_RULE_NAME
+        expr: SUPPRESSION_RULE_NAME
+        data_type: VARCHAR
+      - name: SUPPRESSION_REASON
+        expr: SUPPRESSION_REASON
+        data_type: VARCHAR
+      - name: RANK_FOR_CUSTOMER
+        expr: RANK_FOR_CUSTOMER
+        data_type: NUMBER
+    facts:
+      - name: PROPENSITY
+        expr: PROPENSITY
+        data_type: NUMBER
+      - name: PREMIUM_AT_RISK
+        expr: PREMIUM_AT_RISK
+        data_type: NUMBER
+      - name: EXPECTED_VALUE
+        expr: EXPECTED_VALUE
+        data_type: NUMBER
+        description: Expected monetary value of executing this action, calculated as propensity x EV share x premium at risk. Also called action EV or expected revenue impact.
+      - name: URGENCY
+        expr: URGENCY
+        data_type: NUMBER
+      - name: NBA_SCORE
+        expr: NBA_SCORE
+        data_type: NUMBER
+relationships:
+  - name: NBA_RECOMMENDATION_TO_CUSTOMER_360
+    left_table: NBA_RECOMMENDATION
+    right_table: CUSTOMER_360
+    join_type: inner
+    relationship_type: many_to_one
+    relationship_columns:
+      - left_column: PARTY_ID
+        right_column: PARTY_ID
+verified_queries:
+  - name: 0;1
+    question: How many policyholders are in the book, what is the total GWP, and what
+      is the average churn risk score?
+    sql: SELECT COUNT(*) AS total_policyholders, AVG(CHURN_RISK_SCORE) AS avg_churn_risk,
+      SUM(TOTAL_PREMIUM) AS total_gwp FROM customer_360 WHERE POLICY_COUNT > 0
+    verified_at: 1791126694
+    verified_by: Semantic Model Generator
+  - name: 10;1
+    question: Which states have the worst attrition and how much GWP is at risk?
+    sql: SELECT STATE, COUNT(*) AS customers, AVG(CHURN_RISK_SCORE) AS avg_churn_risk,
+      SUM(TOTAL_PREMIUM) AS total_gwp, SUM(CHURN_RISK_SCORE * TOTAL_PREMIUM) AS expected_gwp_loss
+      FROM customer_360 WHERE POLICY_COUNT > 0 GROUP BY STATE ORDER BY expected_gwp_loss
+      DESC
+    verified_at: 1791126694
+    verified_by: Manual fix  - name: 1;1
+    question: Which policyholders have the highest expected loss from attrition?
+    sql: SELECT PARTY_ID, FIRST_NAME, LAST_NAME, CHURN_RISK_SCORE, TOTAL_PREMIUM,
+      ROUND(CHURN_RISK_SCORE * TOTAL_PREMIUM, 2) AS expected_loss FROM customer_360
+      WHERE CHURN_RISK_SCORE > 0.3 ORDER BY expected_loss DESC LIMIT 10
+    verified_at: 1791126694
+    verified_by: Semantic Model Generator
+  - name: 2;1
+    question: Which states have the highest average attrition risk?
+    sql: SELECT STATE, COUNT(*) AS customers, AVG(CHURN_RISK_SCORE) AS avg_churn,
+      SUM(TOTAL_PREMIUM) AS state_gwp FROM customer_360 WHERE POLICY_COUNT > 0 GROUP
+      BY STATE ORDER BY avg_churn DESC
+    verified_at: 1791126694
+    verified_by: Semantic Model Generator
+  - name: 3;1
+    question: How many next best actions are recommended versus suppressed and what
+      is the total expected value for each?
+    sql: SELECT ACTION_NAME, STATUS, COUNT(*) AS cnt, SUM(EXPECTED_VALUE) AS total_ev
+      FROM nba_recommendation GROUP BY ACTION_NAME, STATUS ORDER BY total_ev DESC
+    verified_at: 1791126694
+    verified_by: Semantic Model Generator
+  - name: 4;1
+    question: Which suppression rules are blocking the most expected value?
+    sql: SELECT SUPPRESSION_RULE_NAME, COUNT(*) AS blocked, SUM(EXPECTED_VALUE) AS
+      ev_forgone FROM nba_recommendation WHERE STATUS = 'SUPPRESSED' GROUP BY SUPPRESSION_RULE_NAME
+      ORDER BY ev_forgone DESC
+    verified_at: 1791126694
+    verified_by: Semantic Model Generator
+  - name: 5;1
+    question: Which high-risk customers are renewing in the next 45 days?
+    sql: SELECT PARTY_ID, FIRST_NAME, LAST_NAME, CHURN_RISK_SCORE, TOTAL_PREMIUM,
+      NEAREST_RENEWAL_DAYS, CHURN_REASON_CODES FROM customer_360 WHERE NEAREST_RENEWAL_DAYS
+      BETWEEN 0 AND 45 AND CHURN_RISK_SCORE > 0.3 ORDER BY CHURN_RISK_SCORE DESC LIMIT
+      20
+    verified_at: 1791126694
+    verified_by: Semantic Model Generator
+  - name: 6;1
+    question: What are the recommended actions for customer CUST-00001?
+    sql: SELECT c.PARTY_ID, c.FIRST_NAME, c.LAST_NAME, c.CHURN_RISK_SCORE, n.ACTION_NAME,
+      n.STATUS, n.EXPECTED_VALUE, n.REASON_TEXT FROM customer_360 AS c JOIN nba_recommendation
+      AS n ON c.PARTY_ID = n.PARTY_ID WHERE c.PARTY_ID = 'CUST-00001' ORDER BY n.RANK_FOR_CUSTOMER
+    verified_at: 1791126694
+    verified_by: Semantic Model Generator
+  - name: 7;1
+    question: What combinations of churn signals produce the highest risk?
+    sql: SELECT SIG_RATE_SHOCK, SIG_DISPUTED_CLAIMS, SIG_NEGATIVE_SENTIMENT, SIG_PAYMENT_DISTRESS,
+      COUNT(*) AS cnt, AVG(CHURN_RISK_SCORE) AS avg_risk FROM customer_360 WHERE CHURN_RISK_SCORE
+      > 0 GROUP BY 1, 2, 3, 4 ORDER BY avg_risk DESC LIMIT 10
+    verified_at: 1791126694
+    verified_by: Semantic Model Generator
+  - name: 8;1
+    question: Which recommended actions need supervisor approval and what is their
+      total expected value?
+    sql: SELECT ACTION_NAME, CATEGORY, COUNT(*) AS cnt, SUM(EXPECTED_VALUE) AS total_ev
+      FROM nba_recommendation WHERE STATUS = 'RECOMMENDED' AND NEEDS_SUPERVISOR =
+      TRUE GROUP BY ACTION_NAME, CATEGORY ORDER BY total_ev DESC
+    verified_at: 1791126694
+    verified_by: Semantic Model Generator
+  - name: 9;1
+    question: What is the total expected value of recommended actions versus suppressed
+      actions across the customer book?
+    sql: SELECT COUNT(DISTINCT PARTY_ID) AS customers_with_actions, SUM(CASE WHEN
+      STATUS = 'RECOMMENDED' THEN EXPECTED_VALUE ELSE 0 END) AS recommended_ev, SUM(CASE
+      WHEN STATUS = 'SUPPRESSED' THEN EXPECTED_VALUE ELSE 0 END) AS suppressed_ev
+      FROM nba_recommendation
+    verified_at: 1791126694
+    verified_by: Semantic Model Generator

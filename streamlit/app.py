@@ -1,5 +1,6 @@
 import streamlit as st
 import plotly.graph_objects as go
+import json
 from snowflake.snowpark.context import get_active_session
 
 st.set_page_config(page_title="Meridian 360", layout="wide")
@@ -262,6 +263,57 @@ with tab2:
                     plot_bgcolor="white", paper_bgcolor="white",
                 )
                 st.plotly_chart(fig, use_container_width=True)
+                st.divider()
+
+            # ── Ask box (Cortex Search RAG) ──
+            st.markdown("##### Ask about this customer")
+            user_q = st.text_input("Question", placeholder="e.g. Why is this customer likely to leave?", key="ask_box")
+            if user_q:
+                search_result = session.sql(f"""
+                    SELECT SNOWFLAKE.CORTEX.SEARCH_PREVIEW(
+                        'MERIDIAN.INTELLIGENCE.INTERACTION_SEARCH',
+                        '{{
+                            "query": "{user_q.replace(chr(34), chr(92)+chr(34)).replace(chr(39), chr(39)+chr(39))}",
+                            "columns": ["INTERACTION_ID", "SUMMARY", "AI_SENTIMENT_LABEL", "AI_KEY_QUOTE", "AI_COMPETITOR_MENTIONED", "TOPIC"],
+                            "filter": {{"@eq": {{"PARTY_ID": "{cust_id}"}}}},
+                            "limit": 5
+                        }}'
+                    )::VARCHAR AS RESULTS
+                """).collect()[0]['RESULTS']
+                sources = json.loads(search_result).get('results', [])
+
+                if not sources:
+                    st.warning("No relevant interactions found for this customer.")
+                else:
+                    context_block = "\n\n".join([
+                        f"Source {j+1} [{src['INTERACTION_ID']}]: {src.get('SUMMARY','')} "
+                        f"Sentiment: {src.get('AI_SENTIMENT_LABEL','')}. "
+                        f"Key quote: {src.get('AI_KEY_QUOTE','')}"
+                        f"{(' Competitor mentioned: ' + src['AI_COMPETITOR_MENTIONED']) if src.get('AI_COMPETITOR_MENTIONED') else ''}"
+                        for j, src in enumerate(sources)
+                    ])
+                    prompt = (
+                        "You are a customer intelligence analyst for a P&C insurer. "
+                        "Answer the question using ONLY the sources provided below. "
+                        "Cite each claim with the source's [INTERACTION_ID]. "
+                        "If the sources do not contain enough information to answer, say so explicitly. "
+                        "Do not invent or assume anything not in the sources.\n\n"
+                        f"Question: {user_q}\n\nSources:\n{context_block}"
+                    )
+                    answer = session.sql(f"""
+                        SELECT AI_COMPLETE('claude-sonnet-4-5', $${prompt}$$)::VARCHAR AS ANSWER
+                    """).collect()[0]['ANSWER']
+
+                    st.markdown(answer)
+                    with st.expander(f"Cited sources ({len(sources)} interactions)"):
+                        for src in sources:
+                            sent_badge = badge(src.get('AI_SENTIMENT_LABEL',''), 'red' if src.get('AI_SENTIMENT_LABEL') == 'NEGATIVE' else 'green')
+                            st.markdown(f"""
+                            <div class="tl-item interaction">
+                                <b>{src['INTERACTION_ID']}</b> · {src.get('TOPIC','')} {sent_badge}<br>
+                                <span style="font-size:0.85rem">{src.get('SUMMARY','')}</span><br>
+                                <span style="font-style:italic;color:#757575;font-size:0.82rem">\"{src.get('AI_KEY_QUOTE','')}\"</span>
+                            </div>""", unsafe_allow_html=True)
                 st.divider()
 
             # ── Timeline ──
