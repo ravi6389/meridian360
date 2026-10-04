@@ -109,3 +109,42 @@ flag), DT_QUOTE, DT_INTERACTION (transcript passthrough).
   Proactive Win-Back, Loyalty Credit, Stalled Claim Escalation).
 - Home Bundle Cross-Sell present but SUPPRESSED by S01 + S05 + S10.
 - Sentiment trajectory declining across 3 calls (0.38 → 0.18 → 0.04).
+
+## 2026-10-04 — Slack MCP action + Nightly pipeline automation
+
+**What CoCo was asked to do:**
+1. Read the Supervisor Rate Review recommendation for CUST-00001 and post a
+   PII-safe retention alert to Slack via the MCP tool.
+2. Set up a nightly automation at 2am IST: refresh enrichment for new
+   transcripts, regenerate recommendations, run guardrail validation, fail
+   loudly on any assertion failure.
+
+**What CoCo produced:**
+
+**Slack MCP action:**
+- Read NBA_RECOMMENDATION for CUST-00001 Supervisor Rate Review (NBA Score
+  3211.16, $45.9K premium at risk, 8 reason codes).
+- Posted PII-safe alert via `mcp_slack_send_slack_message` — party ID, action
+  name, summary, reason codes, evidence ref only. No customer name or raw
+  transcript text (AGENTS.md Rule 7 compliant).
+- Logged action in SERVING.ACTION_LOG (Rule 4 compliant).
+
+**Nightly pipeline automation:**
+- CoCo automations not available on trial account — fell back to Snowflake Task.
+- `ENRICHED.SP_REFRESH_ENRICHMENT()` — incremental Cortex enrichment of new
+  phone transcripts via claude-sonnet-4-5 with JSON parsing and markdown-fence
+  stripping.
+- `SERVING.SP_GUARDRAIL_CHECKS()` — 5 assertions: G1 no cross-sells to
+  open-claim customers, G2 no actions under litigation hold, G3 every
+  recommendation carries evidence (Rule 6), G4 REASON_TEXT populated, G5 no
+  cross-sells to COLLECTIONS customers.
+- `APP.SP_NIGHTLY_PIPELINE()` — orchestrator: enrich → refresh DTs → assert →
+  fail loud. Uses SYSTEM$SET_RETURN_VALUE for task history visibility.
+- `APP.NIGHTLY_PIPELINE_REFRESH` — Snowflake Task, CRON `0 2 * * *
+  Asia/Kolkata`, SUSPEND_TASK_AFTER_NUM_FAILURES = 3.
+- Manual test run passed: 0 new transcripts, all 5 guardrails green.
+- Finding: 9 HOME_BUNDLE_CROSS_SELL rows have empty REASON_CODES (low-churn
+  customers qualifying via bundle gap). EVIDENCE_REF populated, so Rule 6
+  conjunction is satisfied. Noted for future NBA engine fix.
+- All DDL saved to `coco-evidence/automations/nightly_pipeline.sql`.
+- GRANT EXECUTE TASK ON ACCOUNT issued to MERIDIAN_BUILDER via ACCOUNTADMIN.

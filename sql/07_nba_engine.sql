@@ -281,11 +281,14 @@ candidates AS (
     SELECT c.PARTY_ID, 'HOME_BUNDLE_CROSS_SELL',
            c.CHURN_RISK_SCORE, c.TOTAL_PREMIUM,
            c.NEAREST_RENEWAL_DAYS, c.MAX_CLAIM_DAYS_OPEN,
-           c.CHURN_REASON_CODES,
+           ARRAY_CAT(
+               ARRAY_CONSTRUCT('BUNDLE_GAP_HOME', 'MULTI_POLICY_DISCOUNT'),
+               COALESCE(c.CHURN_REASON_CODES, ARRAY_CONSTRUCT())
+           ),
            'Household has auto but no home policy — bundling reduces churn risk by ~50% and increases LTV',
            c.HOUSEHOLD_ID
     FROM SERVING.CUSTOMER_360 c
-    JOIN SERVING.V_HOUSEHOLD_BUNDLE_GAP bg ON c.HOUSEHOLD_ID = bg.HOUSEHOLD_ID
+    JOIN SERVING.DT_HOUSEHOLD_BUNDLE_GAP bg ON c.HOUSEHOLD_ID = bg.HOUSEHOLD_ID
         AND bg.GAP_NEEDS_HOME = TRUE
 
     UNION ALL
@@ -384,7 +387,7 @@ scored AS (
         ) AS RANK_FOR_CUSTOMER
     FROM candidates cand
     JOIN SERVING.ACTION_CATALOG cat ON cand.ACTION_TYPE = cat.ACTION_TYPE
-    LEFT JOIN SERVING.V_SUPPRESSION s
+    LEFT JOIN SERVING.DT_SUPPRESSION s
         ON  cand.PARTY_ID    = s.PARTY_ID
         AND cand.ACTION_TYPE = s.ACTION_TYPE
 )

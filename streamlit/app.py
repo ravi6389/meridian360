@@ -386,14 +386,22 @@ with tab2:
                         </div>""", unsafe_allow_html=True)
 
                         if st.button(f"Execute: {act['ACTION_NAME']}", key=f"exec_{act['ACTION_TYPE']}_{cust_id}"):
-                            session.sql(f"""
-                                INSERT INTO MERIDIAN.SERVING.ACTION_LOG
-                                    (PARTY_ID, ACTION_TYPE, EXECUTED_BY, CHANNEL, OUTCOME, NOTES)
-                                VALUES ('{cust_id}', '{act['ACTION_TYPE']}', CURRENT_USER(),
-                                        '{act['CHANNEL']}', 'PENDING',
-                                        'Executed from Meridian 360 app')
-                            """).collect()
-                            st.success(f"{act['ACTION_NAME']} logged to ACTION_LOG")
+                            result = session.sql(f"""
+                                CALL MERIDIAN.APP.SP_EXECUTE_ACTION(
+                                    '{cust_id}', '{act['ACTION_TYPE']}', CURRENT_USER()
+                                )
+                            """).collect()[0][0]
+                            import json as _json
+                            r = _json.loads(result) if isinstance(result, str) else result
+                            if r.get('success'):
+                                slack = r.get('slack_status', 'UNKNOWN')
+                                st.success(f"{r['action_name']} executed and logged (ID: {r['log_id'][:8]}...)")
+                                if slack == 'SIMULATED':
+                                    st.info("Slack notification simulated (external access not available on trial account). Message payload logged.")
+                                elif slack.startswith('FAILED'):
+                                    st.warning(f"Action logged successfully, but Slack notification failed: {slack}")
+                            else:
+                                st.error(r.get('error', 'Unknown error'))
 
                     if not suppressed.empty:
                         st.markdown("---")
