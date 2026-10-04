@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+
+# Generated data (regenerate with python/gen_synth.py)
+data/*.csv
+
+# Secrets and local config
+.env
+.env.*
+mcp.json
+
+# IDE / OS
+.snowflake/
+.DS_Store
+Thumbs.db
+*.swp
+
+# Python
+*.egg-info/
+dist/
+build/
+.venv/
