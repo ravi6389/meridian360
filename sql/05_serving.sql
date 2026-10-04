@@ -11,16 +11,19 @@ USE WAREHOUSE MERIDIAN_WH;
 USE DATABASE MERIDIAN;
 
 -- ====================================================================
--- ENRICHMENT STUB — placeholder for AI-derived signals.
--- Replace with a real dynamic table when sql/04_enrichment.sql is built.
--- The CUSTOMER_360 LEFT JOINs here; NULLs coalesce to 0.
+-- ENRICHMENT VIEW — aggregates AI signals per party from INTERACTION_AI.
+-- Falls back to NULL stub if INTERACTION_AI is empty.
 -- ====================================================================
 CREATE OR REPLACE VIEW ENRICHED.V_AI_SIGNALS AS
 SELECT
     PARTY_ID,
-    NULL::NUMBER(5,4)  AS AI_CHURN_LANGUAGE_SCORE,
-    NULL::NUMBER(5,4)  AS AI_COMPETITOR_MENTION_SCORE
-FROM RAW.PARTY;
+    MAX(AI_CHURN_SIGNAL::INT)::NUMBER(5,4) AS AI_CHURN_LANGUAGE_SCORE,
+    MAX(CASE WHEN AI_COMPETITOR_MENTIONED IS NOT NULL
+              AND AI_COMPETITOR_MENTIONED != ''
+             THEN 1 ELSE 0 END)::NUMBER(5,4) AS AI_COMPETITOR_MENTION_SCORE
+FROM ENRICHED.INTERACTION_AI
+WHERE PARSE_SUCCESS
+GROUP BY PARTY_ID;
 
 -- ====================================================================
 -- CUSTOMER_360 — one row per customer, all signals + churn score
@@ -197,9 +200,9 @@ scored AS (
              ELSE 0.0
         END AS SIG_MONO_LINE,
 
-        -- Tenure dampener: long tenure reduces churn propensity
-        -- f(t) = 1 / (1 + ln(1 + t)),  t=0 → 1.0,  t=5 → 0.56,  t=12 → 0.38
-        1.0 / (1.0 + LN(1.0 + GREATEST(c.TENURE_YEARS, 0)))
+        -- Tenure dampener: softer linear decay, floor at 0.40
+        -- t=0 → 1.0,  t=5 → 0.75,  t=10 → 0.50,  t=12+ → 0.40
+        GREATEST(0.40, 1.0 - 0.05 * LEAST(c.TENURE_YEARS, 12))
             AS TENURE_DAMPENER
 
     FROM CURATED.DT_CUSTOMER      c
@@ -217,17 +220,18 @@ SELECT
     s.*,
 
     -- Weighted additive churn score, clamped [0, 1]
-    -- Weights sum to 1.0 before the tenure dampener is applied.
+    -- Weights deliberately sum > 1.0 so a multi-signal customer
+    -- can saturate the scale before the tenure dampener applies.
     LEAST(1.0, GREATEST(0.0,
-      ( 0.15 * SIG_NEGATIVE_SENTIMENT
-      + 0.08 * SIG_DECLINING_TRAJECTORY
-      + 0.12 * SIG_CHURN_LANGUAGE
-      + 0.08 * SIG_COMPETITOR_MENTION
-      + 0.12 * SIG_CANCELLATION_PAGES
-      + 0.15 * SIG_RATE_SHOCK
-      + 0.12 * SIG_DISPUTED_CLAIMS
-      + 0.10 * SIG_PAYMENT_DISTRESS
-      + 0.08 * SIG_MONO_LINE
+      ( 0.20 * SIG_NEGATIVE_SENTIMENT
+      + 0.15 * SIG_DECLINING_TRAJECTORY
+      + 0.20 * SIG_CHURN_LANGUAGE
+      + 0.15 * SIG_COMPETITOR_MENTION
+      + 0.15 * SIG_CANCELLATION_PAGES
+      + 0.25 * SIG_RATE_SHOCK
+      + 0.20 * SIG_DISPUTED_CLAIMS
+      + 0.15 * SIG_PAYMENT_DISTRESS
+      + 0.10 * SIG_MONO_LINE
       ) * TENURE_DAMPENER
     ))::NUMBER(5,4)  AS CHURN_RISK_SCORE,
 
