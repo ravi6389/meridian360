@@ -55,3 +55,57 @@ then generate, validate, and load into RAW.
   (10 relationships) plus 12 hero-specific spot checks. All 29 checks passed.
 - CSVs uploaded to `@RAW.SEED_STAGE` and loaded via `SP_LOAD_SEED_DATA()`.
   All row counts confirmed in Snowflake.
+
+## 2026-10-04 — Curated + Serving layers, Enrichment, NBA engine, Streamlit app
+
+**What CoCo was asked to do:**
+Build the full pipeline from curated dynamic tables through enrichment, serving,
+NBA engine, and Streamlit app deployment across multiple iterative steps.
+
+**What CoCo produced:**
+
+**Curated layer** (`sql/03_curated.sql`):
+7 dynamic tables (TARGET_LAG 20min): DT_CUSTOMER (party+household rollup,
+tenure), DT_POLICY (days-to-renewal, rate-shock flag), DT_CLAIM (ageing,
+unresolved flag), DT_BILLING (payment-distress flag), DT_WEB_SESSION (risk-page
+flag), DT_QUOTE, DT_INTERACTION (transcript passthrough).
+
+**Serving layer** (`sql/05_serving.sql`):
+- CUSTOMER_360 dynamic table: 41-column one-row-per-customer view with 9-signal
+  weighted-additive churn model (weights sum > 1.0 for full-range spread, linear
+  tenure dampener floor 0.40). Each signal is an inspectable column. Reason
+  codes as ARRAY. AI signals wired from ENRICHED.V_AI_SIGNALS.
+- CUSTOMER_TIMELINE: unified event stream across all domains.
+- DT_HOUSEHOLD_BUNDLE_GAP: cross-sell opportunity detection.
+- V_RETENTION_WORKLIST: 45-day renewal window, dual ranking (expected loss and
+  churn risk), cross-sell flag.
+
+**AI Enrichment:**
+- ENRICHED.INTERACTION_AI: 630 transcripts processed via claude-sonnet-4-5
+  with single-call JSON extraction (sentiment, intent, churn signal, complaint,
+  competitor, life event, callback, resolution, summary, key quote).
+- 100% parse success rate after markdown-fence stripping.
+- V_AI_SIGNALS: per-party aggregation feeding CUSTOMER_360.
+
+**NBA Engine** (`sql/07_nba_engine.sql`):
+- ACTION_CATALOG: 7 action types across RETENTION, CROSS_SELL, SERVICE, RISK.
+- DT_SUPPRESSION: 12 rules from architecture.md as dynamic table.
+- NBA_RECOMMENDATION: candidate generation per action type, scoring as
+  propensity × EV × urgency, suppression via LEFT JOIN.
+- ACTION_LOG: append-only audit trail.
+- V_SUPPRESSION_AUDIT: guardrail dashboard.
+
+**Streamlit App** (`streamlit/app.py`):
+- Tab 1 (Worklist): retention worklist with sort toggle, churn progress bars.
+- Tab 2 (Customer 360): profile header with warning badges, Plotly sentiment
+  trajectory chart, timeline, NBA panel with recommended/suppressed cards and
+  action execution.
+- Tab 3 (Governance): suppression audit, enrichment QA metrics, rule book.
+- Deployed as `MERIDIAN.APP.MERIDIAN_360` via CREATE STREAMLIT.
+
+**CUST-00001 verification:**
+- Churn risk 0.53 (rank #1 by score), 8 of 9 signals firing.
+- 4 recommended actions (Supervisor Rate Review flagged for approval,
+  Proactive Win-Back, Loyalty Credit, Stalled Claim Escalation).
+- Home Bundle Cross-Sell present but SUPPRESSED by S01 + S05 + S10.
+- Sentiment trajectory declining across 3 calls (0.38 → 0.18 → 0.04).
