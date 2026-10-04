@@ -16,8 +16,8 @@ from collections import defaultdict
 
 # ─── Configuration ──────────────────────────────────────────────────
 SEED = 42
-TODAY = date(2025, 7, 15)
-NOW = datetime(2025, 7, 15, 10, 30, 0)
+TODAY = date.today()
+NOW = datetime.now().replace(second=0, microsecond=0)
 NUM_PARTIES = 500
 NUM_HOUSEHOLDS = 310
 
@@ -779,10 +779,14 @@ def purge_and_inject_hero(households, parties, policies, claims, billing,
         "PAYMENT_METHOD": "CARD", "BILLING_STATUS": "PAID",
     })
 
-    # ── Hero's 3 calls — declining sentiment ──
+    # ── Hero's 3 calls — spread across time so trajectory signal fires ──
+    # Call 1 at 68 days ago (prior 30–60d window): reasonable / concerned
+    # Call 2 at 41 days ago (prior 30–60d window): frustrated
+    # Call 3 at 9 days ago  (recent 0–30d window): angry, names competitor
+    # Trajectory: prior avg ~0.28  vs recent 0.04 → decline > 0.10 → fires
     hero_calls = [
         {
-            "days": 21, "topic": "PREMIUM_INQUIRY",
+            "days": 68, "topic": "PREMIUM_INQUIRY",
             "txt": (
                 f"Hello, I'm calling about my auto policy {hero_pol}. I just received my renewal notice "
                 f"and I see the premium is going up from 36,000 to 45,900 — that's a 27.5 percent increase. "
@@ -792,18 +796,18 @@ def purge_and_inject_hero(households, parties, policies, claims, billing,
             "sent": "NEUTRAL", "score": 0.3800, "resol": "FOLLOW_UP", "dur": 420,
         },
         {
-            "days": 12, "topic": "COMPLAINT",
+            "days": 41, "topic": "COMPLAINT",
             "txt": (
-                f"This is Arjun Mehta, policy {hero_pol}. I called 10 days ago about my premium increase "
-                f"and was told someone would get back to me. No one did. Meanwhile, I also have an open claim "
-                f"{hero_clm} that's been sitting for over 60 days with no resolution — I wasn't even at "
+                f"This is Arjun Mehta, policy {hero_pol}. I called almost a month ago about my premium "
+                f"increase and was told someone would get back to me. No one did. Meanwhile, I also have an "
+                f"open claim {hero_clm} that's been sitting for weeks with no resolution — I wasn't even at "
                 f"fault! So you're raising my rates by 27 percent while failing to settle a legitimate claim. "
                 f"I'm extremely frustrated and I need answers today."
             ),
-            "sent": "NEGATIVE", "score": 0.1500, "resol": "ESCALATED", "dur": 540,
+            "sent": "NEGATIVE", "score": 0.1800, "resol": "ESCALATED", "dur": 540,
         },
         {
-            "days": 5, "topic": "CANCELLATION_REQUEST",
+            "days": 9, "topic": "CANCELLATION_REQUEST",
             "txt": (
                 f"This is my third call. Policy {hero_pol}, claim {hero_clm}. Nothing has changed. "
                 f"My premium is still 45,900, my claim is still unresolved after 74 days, and nobody from your "
@@ -830,10 +834,10 @@ def purge_and_inject_hero(households, parties, policies, claims, billing,
         })
     ni += len(hero_calls)
 
-    # ── Hero web interactions (4 page views in last 19 days) ──
+    # ── Hero web interactions (4 page views spanning both time windows) ──
     for j, (dago, wt) in enumerate([
-        (19, "RATE_COMPARISON"), (14, "CANCELLATION_PAGE"),
-        (9, "RATE_COMPARISON"), (4, "CANCELLATION_PAGE"),
+        (50, "RATE_COMPARISON"), (35, "CANCELLATION_PAGE"),
+        (12, "RATE_COMPARISON"), (5, "CANCELLATION_PAGE"),
     ]):
         wdt = NOW - timedelta(days=dago, hours=random.randint(6, 12))
         interactions.append({
