@@ -1,0 +1,34 @@
+Meridian 360 - Slack MCP server test  (2026-10-05T18:34:52.371Z)
+Server: mcp/slack-webhook/server.mjs   Transport: stdio   Node v26.7.0
+======================================================================
+
+T1 Startup guard (no SLACK_WEBHOOK_URL)
+  [PASS] exits with code 1 - code=1
+  [PASS] explains missing env var
+
+T2 MCP handshake + tools/list
+  [PASS] initialize handshake - server=slack-webhook v1.0.0
+  [PASS] exposes exactly one tool - send_slack_message
+  [PASS] tool is send_slack_message
+  [PASS] 'text' is a required input
+
+T3 tools/call -> webhook (200 OK)
+  [PASS] tool reports success - Message posted to Slack successfully.
+  [PASS] webhook received exactly one POST
+  [PASS] sent as application/json
+  [PASS] payload is {text} only
+  [PASS] text delivered unchanged
+
+T4 tools/call with unknown tool name
+  [PASS] returns isError - Unknown tool: delete_channel
+  [PASS] nothing sent to webhook
+
+T5 webhook returns 400 (e.g. revoked/invalid webhook)
+  [PASS] returns isError - Slack returned 400: invalid_token
+  [PASS] surfaces Slack status + body
+
+T6 webhook unreachable (network failure)
+  [PASS] returns isError instead of crashing - Slack request failed: fetch failed
+
+======================================================================
+ALL TESTS PASSED

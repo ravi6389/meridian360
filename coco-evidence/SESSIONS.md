@@ -148,3 +148,36 @@ flag), DT_QUOTE, DT_INTERACTION (transcript passthrough).
   conjunction is satisfied. Noted for future NBA engine fix.
 - All DDL saved to `coco-evidence/automations/nightly_pipeline.sql`.
 - GRANT EXECUTE TASK ON ACCOUNT issued to MERIDIAN_BUILDER via ACCOUNTADMIN.
+
+## 2026-10-05 — Trial cost containment + Streamlit usability
+
+**What CoCo was asked to do:**
+Stop background credit burn ($400 → $147 in a day) and improve the app for
+first-time viewers.
+
+**What CoCo produced:**
+- Suspended all 12 dynamic tables and set TARGET_LAG = DOWNSTREAM (6 were FULL
+  refresh every 20 minutes because of CURRENT_DATE / CURRENT_TIMESTAMP).
+- Cortex Search INTERACTION_SEARCH target lag raised 1 hour → 24 hours.
+- Nightly task NIGHTLY_PIPELINE_REFRESH suspended.
+- Resource monitor MERIDIAN_RM (40 credits, notify 75%, suspend 90%, hard stop
+  100%) attached to MERIDIAN_WH.
+- `APP.SP_WAKE_FOR_DEMO()` — one CALL resumes and refreshes all 12 DTs in
+  dependency order before recording.
+- Streamlit: new "How it works" first tab with per-tab walkthroughs and worked
+  examples; labelled Worklist column headers with hover definitions; "Ask me
+  anything" box answering what/why/how questions at customer or portfolio
+  scope, grounded in Cortex Search results plus portfolio statistics, with the
+  prompt passed as a bind parameter.
+
+## 2026-10-05 — MCP connection testing
+
+**What CoCo was asked to do:** Prove the Slack MCP connection was tested.
+
+**What CoCo produced:**
+- `mcp/slack-webhook/test.mjs` (`npm test`): drives the real server over stdio
+  with the MCP SDK client against a local mock webhook. Covers the startup
+  guard, handshake, tools/list, the call path, unknown tool, a Slack 400 and a
+  network failure. 16/16 checks passed; log in `coco-evidence/mcp-tests/`.
+- `coco-evidence/mcp-tests/README.md`: test results plus the live 2026-10-04
+  Slack post and its ACTION_LOG row.

@@ -104,7 +104,74 @@ if "active_tab" not in st.session_state:
 
 
 # ─── Tabs ───────────────────────────────────────────────────────────
-tab1, tab2, tab3 = st.tabs(["Worklist", "Customer 360", "Governance"])
+tab0, tab1, tab2, tab3 = st.tabs(["How it works", "Worklist", "Customer 360", "Governance"])
+
+
+# =====================================================================
+# TAB 0: HOW IT WORKS
+# =====================================================================
+with tab0:
+    st.markdown("#### How Meridian 360 works")
+    st.caption("A Customer 360 and Next Best Action engine for a P&C insurer. "
+               "All data is synthetic. Read this tab first, then work left to right.")
+
+    st.markdown("""
+**The flow:** policy, claim, billing, web and call-transcript data is unified per customer →
+Cortex AI reads every call transcript → a transparent churn model scores each customer →
+the NBA engine proposes actions → 12 suppression rules block the unsafe ones → you act.
+""")
+
+    st.divider()
+    st.markdown("##### 1. Worklist: who needs attention this week")
+    st.markdown("""
+Every customer renewing in the next 45 days who shows churn risk, ranked by **expected loss**
+(churn risk × annual premium). Tick the checkbox to rank by raw churn risk instead.
+
+| Column | Meaning |
+|---|---|
+| **Renews in** | Days until the nearest policy renewal (e.g. `5d`) |
+| **Churn risk** | Probability-style score 0–100% from 9 weighted signals; bar is green < 30%, amber 30–50%, red ≥ 50% |
+| **Annual premium** | Total premium across the customer's active policies |
+| **Expected loss** | Churn risk × premium: the revenue at stake if nobody acts |
+| **Signals** | How many of the 9 churn signals are firing |
+| **Cross-sell gap** | Product the household is missing (HOME, AUTO, UMBRELLA) |
+
+**Example:** *Jennifer Moore · 5d · 48% · 74,913 · 35,958 · 3 signals · UMBRELLA* means she renews in
+5 days, has a 48% churn risk on 74,913 of premium, so about 35,958 is at risk. Three signals are firing,
+and her household has no umbrella cover. Click **View** and open the Customer 360 tab.
+""")
+
+    st.divider()
+    st.markdown("##### 2. Customer 360: everything about one customer")
+    st.markdown("""
+- **Header:** tenure, premium, churn risk, renewal countdown, and red/amber warning badges
+  (open claim, competitor shopping, churn language, rate shock, cancellation browsing).
+- **Sentiment trajectory:** AI-scored sentiment of each phone call over time. A falling line is a churn warning.
+- **Ask me anything:** plain-English what / why / how questions, answered by Cortex AI from
+  call transcripts plus portfolio statistics, with citations. Scope it to this customer or the whole book.
+- **Timeline:** every policy, claim, billing, call, web and quote event in one stream.
+- **Next Best Actions:** recommended actions with reason, expected value, urgency and SLA, plus an
+  **Execute** button that logs the action. Suppressed actions are shown greyed out with the rule that blocked them.
+
+**Example:** pick **Arjun Mehta (CUST-00001)**. He has a 27.5% premium increase, a 74-day open claim,
+three calls with sentiment falling 0.38 → 0.18 → 0.04, and a competitor quote 13,000 cheaper.
+The engine recommends a Supervisor Rate Review and a Win-Back call, and **suppresses** the Home Bundle
+Cross-Sell because rule S01 forbids selling to someone with an open claim.
+Try asking: *"Why is this customer likely to leave?"*
+""")
+
+    st.divider()
+    st.markdown("##### 3. Governance: proof the guardrails work")
+    st.markdown("""
+- **Suppression audit:** for each rule, how many actions it blocked, how many customers, and the
+  expected value deliberately given up to stay compliant.
+- **AI enrichment QA:** parse rate and counts of churn signals, complaints and competitor mentions
+  extracted from 630 transcripts.
+- **Rule book:** all 12 suppression rules with their scope, trigger condition and rationale.
+
+**Example:** the S01 row shows every cross-sell blocked because the customer had an open claim. That
+revenue was given up on purpose, and nothing in it was recommended.
+""")
 
 
 # =====================================================================
@@ -129,9 +196,28 @@ with tab1:
     if wl.empty:
         st.info("No customers with upcoming renewals and churn risk.")
     else:
+        widths = [0.25, 0.08, 0.12, 0.12, 0.12, 0.08, 0.08, 0.15]
+        hdr = st.columns(widths)
+        headers = [
+            ("Customer", "Name and customer ID"),
+            ("Renews in", "Days until the nearest policy renewal"),
+            ("Churn risk", "0-100% score from 9 weighted signals. Green <30%, amber 30-50%, red >=50%"),
+            ("Annual premium", "Total premium across active policies"),
+            ("Expected loss", "Churn risk x annual premium: revenue at stake if nobody acts"),
+            ("Signals", "How many of the 9 churn signals are firing"),
+            ("Cross-sell", "Product the household is missing"),
+            ("", ""),
+        ]
+        for col, (label, tip) in zip(hdr, headers):
+            if label:
+                col.markdown(f"<span style='font-size:0.75rem;color:#757575;text-transform:uppercase;"
+                             f"letter-spacing:0.05em;font-weight:600' title='{tip}'>{label}</span>",
+                             unsafe_allow_html=True)
+        st.caption("Hover a column header for its definition. Expected loss = churn risk x annual premium.")
+
         for _, row in wl.iterrows():
             with st.container():
-                cols = st.columns([0.25, 0.08, 0.12, 0.12, 0.12, 0.08, 0.08, 0.15])
+                cols = st.columns(widths)
                 cols[0].markdown(f"**{row['NAME']}**<br><span style='color:#9E9E9E;font-size:0.75rem'>{row['PARTY_ID']}</span>", unsafe_allow_html=True)
                 cols[1].markdown(f"**{int(row['NEAREST_RENEWAL_DAYS'])}d**")
                 score = float(row['CHURN_RISK_SCORE'] or 0)
@@ -265,52 +351,102 @@ with tab2:
                 st.plotly_chart(fig, use_container_width=True)
                 st.divider()
 
-            # ── Ask box (Cortex Search RAG) ──
-            st.markdown("##### Ask about this customer")
-            user_q = st.text_input("Question", placeholder="e.g. Why is this customer likely to leave?", key="ask_box")
+            # ── Ask me anything (Cortex Search RAG + portfolio stats) ──
+            st.markdown("##### Ask me anything: what? why? how?")
+            st.caption("Plain-English questions about this customer, the customer base, or customer behaviour. "
+                       "Answers come from call transcripts and portfolio statistics, with citations.")
+            scope = st.radio("Scope", ["This customer", "All customers"], horizontal=True, key="ask_scope")
+            user_q = st.text_input(
+                "Question",
+                placeholder=("e.g. Why is this customer likely to leave?  ·  What do angry customers complain about?  ·  "
+                             "How many customers mention a competitor?"),
+                key="ask_box",
+            )
             if user_q:
-                search_result = session.sql(f"""
-                    SELECT SNOWFLAKE.CORTEX.SEARCH_PREVIEW(
-                        'MERIDIAN.INTELLIGENCE.INTERACTION_SEARCH',
-                        '{{
-                            "query": "{user_q.replace(chr(34), chr(92)+chr(34)).replace(chr(39), chr(39)+chr(39))}",
-                            "columns": ["INTERACTION_ID", "SUMMARY", "AI_SENTIMENT_LABEL", "AI_KEY_QUOTE", "AI_COMPETITOR_MENTIONED", "TOPIC"],
-                            "filter": {{"@eq": {{"PARTY_ID": "{cust_id}"}}}},
-                            "limit": 5
-                        }}'
-                    )::VARCHAR AS RESULTS
-                """).collect()[0]['RESULTS']
+                # Cortex Search payload in a $$-quoted literal so JSON escapes survive SQL parsing
+                payload = {
+                    "query": user_q.replace("$$", ""),
+                    "columns": ["INTERACTION_ID", "PARTY_ID", "SUMMARY", "AI_SENTIMENT_LABEL",
+                                "AI_KEY_QUOTE", "AI_COMPETITOR_MENTIONED", "TOPIC"],
+                    "limit": 5 if scope == "This customer" else 8,
+                }
+                if scope == "This customer":
+                    payload["filter"] = {"@eq": {"PARTY_ID": cust_id}}
+                search_result = session.sql(
+                    "SELECT SNOWFLAKE.CORTEX.SEARCH_PREVIEW('MERIDIAN.INTELLIGENCE.INTERACTION_SEARCH', "
+                    f"$${json.dumps(payload)}$$)::VARCHAR AS RESULTS"
+                ).collect()[0]['RESULTS']
                 sources = json.loads(search_result).get('results', [])
 
-                if not sources:
-                    st.warning("No relevant interactions found for this customer.")
-                else:
-                    context_block = "\n\n".join([
-                        f"Source {j+1} [{src['INTERACTION_ID']}]: {src.get('SUMMARY','')} "
-                        f"Sentiment: {src.get('AI_SENTIMENT_LABEL','')}. "
-                        f"Key quote: {src.get('AI_KEY_QUOTE','')}"
-                        f"{(' Competitor mentioned: ' + src['AI_COMPETITOR_MENTIONED']) if src.get('AI_COMPETITOR_MENTIONED') else ''}"
-                        for j, src in enumerate(sources)
-                    ])
-                    prompt = (
-                        "You are a customer intelligence analyst for a P&C insurer. "
-                        "Answer the question using ONLY the sources provided below. "
-                        "Cite each claim with the source's [INTERACTION_ID]. "
-                        "If the sources do not contain enough information to answer, say so explicitly. "
-                        "Do not invent or assume anything not in the sources.\n\n"
-                        f"Question: {user_q}\n\nSources:\n{context_block}"
-                    )
-                    answer = session.sql(f"""
-                        SELECT AI_COMPLETE('claude-sonnet-4-5', $${prompt}$$)::VARCHAR AS ANSWER
-                    """).collect()[0]['ANSWER']
+                stats = q("""
+                    SELECT COUNT(*) AS CUSTOMERS,
+                           ROUND(AVG(CHURN_RISK_SCORE), 3) AS AVG_CHURN_RISK,
+                           SUM(IFF(CHURN_RISK_SCORE >= 0.5, 1, 0)) AS HIGH_RISK,
+                           SUM(IFF(OPEN_CLAIMS > 0, 1, 0)) AS WITH_OPEN_CLAIM,
+                           SUM(IFF(SIG_RATE_SHOCK > 0, 1, 0)) AS WITH_RATE_SHOCK,
+                           SUM(IFF(SIG_COMPETITOR_MENTION > 0, 1, 0)) AS MENTIONED_COMPETITOR,
+                           SUM(IFF(SIG_CHURN_LANGUAGE > 0, 1, 0)) AS USED_CHURN_LANGUAGE,
+                           SUM(IFF(SIG_NEGATIVE_SENTIMENT > 0, 1, 0)) AS NEGATIVE_SENTIMENT,
+                           SUM(IFF(SIG_PAYMENT_DISTRESS > 0, 1, 0)) AS PAYMENT_DISTRESS,
+                           SUM(IFF(LOB_COUNT <= 1, 1, 0)) AS MONO_LINE,
+                           ROUND(SUM(TOTAL_PREMIUM), 0) AS TOTAL_PREMIUM,
+                           ROUND(SUM(CHURN_RISK_SCORE * TOTAL_PREMIUM), 0) AS PREMIUM_AT_RISK
+                    FROM MERIDIAN.SERVING.CUSTOMER_360
+                """).iloc[0].to_dict()
+                actions = q("""
+                    SELECT ACTION_NAME, STATUS, COUNT(*) AS N
+                    FROM MERIDIAN.SERVING.NBA_RECOMMENDATION GROUP BY 1, 2 ORDER BY 1, 2
+                """)
+                stats_block = "; ".join(f"{k}={v}" for k, v in stats.items())
+                actions_block = "; ".join(f"{a['ACTION_NAME']} {a['STATUS']}={a['N']}" for _, a in actions.iterrows())
 
-                    st.markdown(answer)
+                profile_block = ""
+                if scope == "This customer":
+                    cust_nbas = q(f"""
+                        SELECT ACTION_NAME, STATUS, SUPPRESSION_RULE_NAME
+                        FROM MERIDIAN.SERVING.NBA_RECOMMENDATION WHERE PARTY_ID = '{cust_id}'
+                    """)
+                    nba_list = ", ".join(
+                        f"{n['ACTION_NAME']} ({n['STATUS']}"
+                        f"{' by ' + n['SUPPRESSION_RULE_NAME'] if n['SUPPRESSION_RULE_NAME'] else ''})"
+                        for _, n in cust_nbas.iterrows())
+                    profile_block = (
+                        f"\n\n[CUSTOMER PROFILE] {cust_id}: tenure {c['TENURE_YEARS']} years, premium {c['TOTAL_PREMIUM']}, "
+                        f"churn risk {c['CHURN_RISK_SCORE']}, reason codes {list(c['CHURN_REASON_CODES'] or [])}, "
+                        f"renewal in {c['NEAREST_RENEWAL_DAYS']} days, open claims {c['OPEN_CLAIMS']}, "
+                        f"longest claim open {c['MAX_CLAIM_DAYS_OPEN']} days, lines of business {c['LOB_COUNT']}. "
+                        f"Actions: {nba_list or 'none'}."
+                    )
+
+                context_block = "\n\n".join([
+                    f"Source {j+1} [{src['INTERACTION_ID']}] (customer {src.get('PARTY_ID','')}): {src.get('SUMMARY','')} "
+                    f"Sentiment: {src.get('AI_SENTIMENT_LABEL','')}. "
+                    f"Key quote: {src.get('AI_KEY_QUOTE','')}"
+                    f"{(' Competitor mentioned: ' + src['AI_COMPETITOR_MENTIONED']) if src.get('AI_COMPETITOR_MENTIONED') else ''}"
+                    for j, src in enumerate(sources)
+                ]) or "No matching call interactions."
+                prompt = (
+                    "You are a customer intelligence analyst for Meridian, a P&C insurer. "
+                    "Answer what / why / how questions about customers and their behaviour using ONLY the context below: "
+                    "portfolio statistics, the action summary, the customer profile if present, and retrieved call interactions. "
+                    "Cite call evidence as [INTERACTION_ID], statistics as [PORTFOLIO STATS], and profile facts as [CUSTOMER PROFILE]. "
+                    "If the context does not contain enough information, say so explicitly. Do not invent anything.\n\n"
+                    f"Question: {user_q}\n\n"
+                    f"[PORTFOLIO STATS] {stats_block}\n\n[ACTION SUMMARY] {actions_block}"
+                    f"{profile_block}\n\nCall interactions:\n{context_block}"
+                )
+                answer = session.sql(
+                    "SELECT AI_COMPLETE('claude-sonnet-4-5', ?)::VARCHAR AS ANSWER", params=[prompt]
+                ).collect()[0]['ANSWER']
+
+                st.markdown(answer)
+                if sources:
                     with st.expander(f"Cited sources ({len(sources)} interactions)"):
                         for src in sources:
                             sent_badge = badge(src.get('AI_SENTIMENT_LABEL',''), 'red' if src.get('AI_SENTIMENT_LABEL') == 'NEGATIVE' else 'green')
                             st.markdown(f"""
                             <div class="tl-item interaction">
-                                <b>{src['INTERACTION_ID']}</b> · {src.get('TOPIC','')} {sent_badge}<br>
+                                <b>{src['INTERACTION_ID']}</b> · {src.get('PARTY_ID','')} · {src.get('TOPIC','')} {sent_badge}<br>
                                 <span style="font-size:0.85rem">{src.get('SUMMARY','')}</span><br>
                                 <span style="font-style:italic;color:#757575;font-size:0.82rem">\"{src.get('AI_KEY_QUOTE','')}\"</span>
                             </div>""", unsafe_allow_html=True)
